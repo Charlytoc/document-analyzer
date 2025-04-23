@@ -68,7 +68,14 @@ class NamespaceEvents(socketio.AsyncNamespace):
                 You are given a question and a set of documents.
                 Your task is to answer the question using the information provided in the documents.
 
-                The documents are:
+                ### RULES
+                - Your response must be only in Spanish.
+                - You should use a natural language, not a legal language.
+                - You should answer the question based on the information provided in the documents. If you don't have enough information, say that you don't know because you don't have enough information.
+                - Be as specific as possible.
+                - Think before giving your response, don't rush.
+                
+                
                 ---
                 {all_documents_text[:MAX_CHARACTERS_FOR_ANALYSIS]}
                 ---
