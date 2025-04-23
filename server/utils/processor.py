@@ -8,7 +8,7 @@ from server.utils.ai_interface import AIInterface
 from server.utils.constants import UPLOADS_PATH
 
 EXPIRATION_TIME = 60 * 60 * 24 * 30  # 30 days
-BATCH_SIZE = os.getenv("BATCH_SIZE", 12500)
+BATCH_SIZE = int(os.getenv("BATCH_SIZE", 12500))
 
 printer = Printer("ROUTES")
 redis_cache = RedisCache()
