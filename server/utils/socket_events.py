@@ -17,8 +17,6 @@ MAX_CHARACTERS_FOR_ANALYSIS = 50000
 
 
 class NamespaceEvents(socketio.AsyncNamespace):
-    # user_id_to_socket_id = {}
-    # socket_id_to_user_id = {}
 
     def on_connect(self, sid, environ):
         print("CONNECTED TO SOCKET")
@@ -46,34 +44,19 @@ class NamespaceEvents(socketio.AsyncNamespace):
             printer.red("The client id or prompt is not valid")
             return
 
-        # if not redis_cache.exists(client_id):
-        #     printer.red("The client id does not exist in the redis cache")
-        #     return
-
-        # saved_context = json.loads(redis_cache.get(client_id) or "{}")
-
-        # if not saved_context:
-        #     printer.red("The client id does not exist in the redis cache")
-        #     return
-
-        # printer.blue(saved_context, "SAVED CONTEXT")
         all_documents_text = ""
-        # Recorrer todas las keys de saved_context
-        # for key in saved_context.keys():
-        #     if key == "client_id":
-        #         continue
 
-        #             all_documents_text += f"""
-        # <document name="{saved_context[key].get('filename', '')}">
-        #     {saved_context[key].get('text', '')}
-        # </document>
-        # """
         for file in files:
             doc = redis_cache.get(file.get("hash"))
             doc = json.loads(doc)
             all_documents_text += f"""
 <document name="{file.get('name', '')}">
-    {doc.get("analysis", "") or doc.get("text", "")}
+<analysis desc="This is a previous analysis an AI made of the document, it may be incomplete or incorrect, you can use it in your response if needed">
+    {doc.get("analysis", "")}
+</analysis>
+<text desc="This is the text of the document">
+    {doc.get("text", "")[:MAX_CHARACTERS_FOR_ANALYSIS]}
+</text>
 </document>
 """
 
@@ -105,26 +88,6 @@ class NamespaceEvents(socketio.AsyncNamespace):
 
         await sio.emit("message_response", {"message": response}, to=sid)
 
-    # async def on_listen_analysis(self, sid, job_id):
-    #     from .socket_server import sio
-
-    #     printer.blue("An user wants to listen the analysis of a document")
-
-    #     if redis_cache.exists(job_id):
-    #         printer.blue("The job id exists in the redis cache")
-    #         saved_context = json.loads(redis_cache.get(job_id) or "{}")
-    #         saved_context["client_id"] = sid
-
-    #         redis_cache.set(
-    #             job_id, json.dumps(saved_context).encode("utf-8"), EXPIRATION_TIME
-    #         )
-    #         await sio.emit("analysis_response", saved_context, to=sid)
-    #     else:
-    #         printer.blue("The job id does not exist in the redis cache")
-
-    #     return job_id
-
     def on_disconnect(self, sid):
 
         print("DISCONNECTED FROM SOCKET")
-        # on_disconnect_handler(socket_id=sid)
