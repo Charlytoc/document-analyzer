@@ -9,11 +9,12 @@ from server.utils.constants import UPLOADS_PATH
 
 EXPIRATION_TIME = 60 * 60 * 24 * 30  # 30 days
 BATCH_SIZE = 12500
-MODEL = "gemma3:4b"
 
 printer = Printer("ROUTES")
 redis_cache = RedisCache()
-ai_interface = AIInterface(provider="openai", api_key=os.getenv("OPENAI_API_KEY"))
+ai_interface = AIInterface(
+    provider=os.getenv("PROVIDER", "openai"), api_key=os.getenv("OPENAI_API_KEY")
+)
 
 
 def notify_client(
@@ -62,7 +63,7 @@ def process_document(
         doc["analysis"] = "\n".join(document_analysis)
         redis_cache.set(doc_hash, json.dumps(doc), EXPIRATION_TIME)
 
-        printer.green(f"Documento guardado en el caché")
+        printer.green("Documento guardado en el caché")
         return document_text, "\n".join(document_analysis)
 
 
@@ -154,6 +155,8 @@ def analize_document_section(batch_text: str, previous_analysis: list[str] = [])
         {"role": "user", "content": batch_text},
     ]
 
-    response = ai_interface.chat(messages=messages, model="gpt-4o-mini")
+    response = ai_interface.chat(
+        messages=messages, model=os.getenv("MODEL", "gpt-4o-mini")
+    )
 
     return response

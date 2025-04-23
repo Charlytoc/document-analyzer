@@ -34,7 +34,8 @@ class NamespaceEvents(socketio.AsyncNamespace):
         from .socket_server import sio
 
         ai_interface = AIInterface(
-            provider="openai", api_key=os.getenv("OPENAI_API_KEY")
+            provider=os.getenv("PROVIDER", "openai"),
+            api_key=os.getenv("OPENAI_API_KEY"),
         )
         client_id = data.get("client_id", None)
         files = data.get("files", None)
@@ -99,7 +100,7 @@ class NamespaceEvents(socketio.AsyncNamespace):
 
         response = ai_interface.chat(
             messages=messages,
-            model="gpt-4o-mini",
+            model=os.getenv("MODEL", "gpt-4o-mini"),
         )
 
         await sio.emit("message_response", {"message": response}, to=sid)
