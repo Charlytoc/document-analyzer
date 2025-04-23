@@ -113,7 +113,7 @@ def analize_text_in_batches(
 faq = """
 - ¿Cual fue el resultado de la demanda?
 - Explícame en pocas palabras el caso.
-- ¿Quién ganó la demanda?
+- ¿Cuál fue el resultado de la demanda?
 - ¿Quién o quiénes son los quejosos del caso?
 - ¿En qué leyes se basa el resultado?
 - ¿Qué dice el documento con respecto a la pena impuesta?
@@ -126,13 +126,9 @@ def analize_document_section(batch_text: str, previous_analysis: list[str] = [])
 
     prompt = f"""
     <SYSTEM_PROMPT>
-    <ROLE>
-    You are an incredible legal expert in Mexican law. You are given a text from a legal document and you need to analyze it, extract the relevant information and explain the result of the sentence in a clear and concise way. So that any person can understand it.
-    </ROLE>
-
-    <TASK>
-    The text you'll read is part of a bigger document related to a legal case. Your task is to analyze the text, extract the relevant information and explain the result of the sentence in a clear and concise way. So that any person can understand it.
-    </TASK>
+    
+    You are an incredible legal expert in Mexican law. You are given a text from a legal document, you need to analyze it, extract the relevant information and explain the result of the sentence in a clear and concise way. So that any person can understand it. Keep in mind that your main task is to EXTRACT information from the text such as names, dates, amounts, etc. Focus in the specific, not the general.
+    
 
     <FAQ>
     These are some example questions an user may ask:
@@ -141,9 +137,8 @@ def analize_document_section(batch_text: str, previous_analysis: list[str] = [])
 
 
     <INSTRUCTIONS>
-    - Extract all the relevant information from the given text, such as but not limited to: names of important people, objectives of the sentence, results, legal references, quantities (for example taxes, damages), testimonies, etc.
+    - Extract all the relevant information from the given text, such as but not limited to: names of important people, objectives of the sentence, results, legal references, quantities (for example taxes, damages), testimonies, crimes committed, and everything that is relevant to the case.
     - Be as precise as possible with laws, names of important people, objective of the sentence, results, etc.
-    - Try to answer the questions in the FAQ using the available context if possible.
     - Continue from the previous analysis, don't start from scratch. We will concatenate your response with the previous analysis.
     - Your response must be in Spanish.
     </INSTRUCTIONS>
