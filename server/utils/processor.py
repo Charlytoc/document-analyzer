@@ -4,7 +4,7 @@ import requests
 from server.utils.pdf_reader import PDFReader
 from server.utils.printer import Printer
 from server.utils.redis_cache import RedisCache
-from server.utils.ai_interface import AIInterface
+from server.utils.ai_interface import AIInterface, get_physical_context
 from server.utils.constants import UPLOADS_PATH
 
 EXPIRATION_TIME = 60 * 60 * 24 * 30  # 30 days
@@ -108,25 +108,7 @@ def analize_text_in_batches(
     return document_analysis
 
 
-faq = """
-- ¿Cual fue el resultado de la demanda?
-- Explícame en pocas palabras el caso.
-- ¿Cuál fue el resultado de la demanda?
-- ¿Quién o quiénes son los quejosos del caso?
-- ¿En qué leyes se basa el resultado?
-- ¿Qué dice el documento con respecto a la pena impuesta?
-
-"""
-
-
-def analize_document_section(batch_text: str, previous_analysis: list[str] = []):
-    # physical_context = get_physical_context()
-
-    ai_interface = AIInterface(
-        provider=os.getenv("PROVIDER", "openai"), api_key=os.getenv("OPENAI_API_KEY")
-    )
-    
-    prompt = f"""
+default_prompt = """
     <SYSTEM_PROMPT>
     
     You are an incredible legal expert in Mexican law. You are given a text from a legal document, you need to analyze it, extract the relevant information and explain the result of the sentence in a clear and concise way. So that any person can understand it. Keep in mind that your main task is to EXTRACT information from the text such as names, dates, amounts, etc. Focus in the specific, not the general.
@@ -134,8 +116,20 @@ def analize_document_section(batch_text: str, previous_analysis: list[str] = [])
 
     <FAQ>
     These are some example questions an user may ask:
-    {faq}
+    - ¿Cual fue el resultado de la demanda?
+    - Explícame en pocas palabras el caso.
+    - ¿Cuál fue el resultado de la demanda?
+    - ¿Quién o quiénes son los quejosos del caso?
+    - ¿En qué leyes se basa el resultado?
+    - ¿Qué dice el documento con respecto a la pena impuesta?
+
     </FAQ>
+
+    
+    This context files are useful to help you in your analysis, they are NOT part of the document you are analyzing, they are only a reference for you to answer the questions:
+    ---
+    {{context}}
+    ---
 
 
     <INSTRUCTIONS>
@@ -145,7 +139,25 @@ def analize_document_section(batch_text: str, previous_analysis: list[str] = [])
     - Your response must be in Spanish.
     </INSTRUCTIONS>
 
-    """
+"""
+
+
+def analize_document_section(batch_text: str, previous_analysis: list[str] = []):
+    physical_context = get_physical_context()
+
+    ai_interface = AIInterface(
+        provider=os.getenv("PROVIDER", "openai"), api_key=os.getenv("OPENAI_API_KEY")
+    )
+
+    prompt = os.getenv("SYSTEM_PROMPT", None)
+    if not prompt:
+        printer.red(
+            "No se encontró el SYSTEM_PROMPT en el archivo .env, agréguelo para tener un análisis más preciso"
+        )
+        prompt = default_prompt
+
+    prompt = prompt.replace("{{context}}", physical_context)
+
     messages = [
         {"role": "system", "content": prompt},
         *[{"role": "assistant", "content": a} for a in previous_analysis],

@@ -17,3 +17,13 @@ To run a Redis container:
 ```bash
 docker run -d --name document_redis -p 6380:6379 redis
 ```
+
+
+
+```bash
+./start.sh -m prod
+```
+
+
+
+
