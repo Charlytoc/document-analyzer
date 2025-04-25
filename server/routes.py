@@ -14,7 +14,7 @@ os.makedirs(f"{UPLOADS_PATH}/images", exist_ok=True)
 os.makedirs(f"{UPLOADS_PATH}/documents", exist_ok=True)
 os.makedirs(f"{UPLOADS_PATH}/analysis", exist_ok=True)
 
-router = APIRouter()
+router = APIRouter(prefix="/api")
 printer = Printer("ROUTES")
 redis_cache = RedisCache()
 

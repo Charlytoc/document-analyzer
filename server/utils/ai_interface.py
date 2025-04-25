@@ -124,6 +124,8 @@ class AIInterface:
         else:
             raise ValueError(f"Provider {provider} not supported")
 
+        printer.blue("Using AI from", self.provider)
+
     def chat(
         self,
         messages: list[dict],

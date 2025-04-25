@@ -13,6 +13,10 @@ from server.utils.socket_server import sio
 printer = Printer("MAIN")
 
 
+os.makedirs("uploads/images", exist_ok=True)
+os.makedirs("uploads/documents", exist_ok=True)
+
+
 @asynccontextmanager
 async def lifespan(app: FastAPI):
     printer.yellow("Checking ollama installation")
@@ -39,16 +43,13 @@ app.add_middleware(
 
 sio_asgi_app = socketio.ASGIApp(socketio_server=sio, other_asgi_app=app)
 
+app.include_router(router)
 app.add_route("/socket.io/", route=sio_asgi_app, methods=["GET", "POST"])
 app.add_websocket_route("/socket.io/", route=sio_asgi_app)
 
-app.mount("/client", StaticFiles(directory="client/dist", html=True), name="client")
-
-os.makedirs("uploads/images", exist_ok=True)
-os.makedirs("uploads/documents", exist_ok=True)
+app.mount("/", StaticFiles(directory="client/dist", html=True), name="client")
 
 UPLOADS_PATH = "uploads"
-app.include_router(router)
 
 
 if __name__ == "__main__":

@@ -5,7 +5,7 @@ export const API_URL = "http://localhost:8005";
 
 export const uploadData = async (formData: FormData, clientId: string) => {
   try {
-    const response = await axios.post(`${API_URL}/upload/`, formData, {
+    const response = await axios.post(`${API_URL}/api/upload/`, formData, {
       headers: {
         "client-id": clientId,
       },

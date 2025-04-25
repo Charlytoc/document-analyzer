@@ -12,9 +12,6 @@ BATCH_SIZE = int(os.getenv("BATCH_SIZE", 12500))
 
 printer = Printer("ROUTES")
 redis_cache = RedisCache()
-ai_interface = AIInterface(
-    provider=os.getenv("PROVIDER", "openai"), api_key=os.getenv("OPENAI_API_KEY")
-)
 
 
 def notify_client(
@@ -22,7 +19,7 @@ def notify_client(
 ):
     if client_id:
         requests.post(
-            f"http://localhost:8005/webhook/{client_id}",
+            f"http://localhost:8005/api/webhook/{client_id}",
             json={
                 "hash_key": doc_hash,
                 "analysis": analysis,
@@ -70,6 +67,7 @@ def process_document(
 def analize_text_in_batches(
     text: str, batch_size: int = BATCH_SIZE, client_id: str = None, doc_hash: str = None
 ):
+
     printer.yellow(
         f"Iniciando análisis de texto con tamaño de batch {batch_size} palabras y 20% de superposición"
     )
@@ -124,6 +122,10 @@ faq = """
 def analize_document_section(batch_text: str, previous_analysis: list[str] = []):
     # physical_context = get_physical_context()
 
+    ai_interface = AIInterface(
+        provider=os.getenv("PROVIDER", "openai"), api_key=os.getenv("OPENAI_API_KEY")
+    )
+    
     prompt = f"""
     <SYSTEM_PROMPT>
     
