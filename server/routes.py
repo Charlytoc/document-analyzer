@@ -1,73 +1,72 @@
 import json
-from fastapi import APIRouter, UploadFile, File, Form, Request, Header
+from fastapi import APIRouter, UploadFile, File, Form
 import shutil
 import os
 from typing import List
 
 from server.utils.printer import Printer
 from server.utils.redis_cache import RedisCache
-from server.tasks import process_document_task
-from server.utils.constants import CLIENTS_KEY
+from server.utils.processor import generate_sentence_brief
 
 UPLOADS_PATH = "uploads"
 os.makedirs(f"{UPLOADS_PATH}/images", exist_ok=True)
 os.makedirs(f"{UPLOADS_PATH}/documents", exist_ok=True)
-os.makedirs(f"{UPLOADS_PATH}/analysis", exist_ok=True)
 
 router = APIRouter(prefix="/api")
 printer = Printer("ROUTES")
 redis_cache = RedisCache()
 
+from fastapi import HTTPException
 
-@router.post("/upload/")
-async def upload_files(
+
+@router.post("/generate-sentence-brief")
+async def generate_sentence_brief_route(
     images: List[UploadFile] = File([]),
     documents: List[UploadFile] = File([]),
-    hashes: str = Form(...),
-    client_id: str = Header(...),
+    extra_data: str = Form(None),
 ):
-    printer.blue(f"🖥️ Un usuario con id {client_id} acaba de subir archivos")
-    parsed_hashes = json.loads(hashes)
-    printer.yellow(parsed_hashes, "Parsed hashes")
+    printer.yellow("🔄 Generando sentencia ciudadana...")
 
-    printer.yellow("🔄 Analizando archivos...")
+    # 🚨 Validación de archivos
+    if not images and not documents:
+        printer.red("❌ No se enviaron documentos ni imágenes.")
+        raise HTTPException(
+            status_code=400,
+            detail={
+                "status": "ERROR",
+                "message": "Debes enviar al menos un documento o una imagen para generar la sentencia ciudadana.",
+            },
+        )
+
+    document_paths: list[str] = []
+    images_paths: list[str] = []
+
     for image in images:
-        with open(f"{UPLOADS_PATH}/images/{image.filename}", "wb") as buffer:
+        image_path = f"{UPLOADS_PATH}/images/{image.filename}"
+        images_paths.append(image_path)
+        with open(image_path, "wb") as buffer:
             shutil.copyfileobj(image.file, buffer)
+
     for document in documents:
-        with open(f"{UPLOADS_PATH}/documents/{document.filename}", "wb") as buffer:
+        document_path = f"{UPLOADS_PATH}/documents/{document.filename}"
+        document_paths.append(document_path)
+        with open(document_path, "wb") as buffer:
             shutil.copyfileobj(document.file, buffer)
 
-    for document in documents:
-        # Find the hash in the hashes list
-        doc_hash = next(
-            (
-                h.get("hash")
-                for h in parsed_hashes
-                if h.get("name") == document.filename
-            ),
-            None,
-        )
-        if doc_hash:
+    # Procesar el JSON si viene
+    extra_info = {}
+    if extra_data:
+        try:
+            extra_info = json.loads(extra_data)
+            printer.blue(extra_info, "Información adicional recibida")
+        except json.JSONDecodeError:
+            printer.red("❌ Error al decodificar el JSON enviado en extra_data")
 
-            process_document_task.delay(document.filename, doc_hash, client_id)
-        else:
-            printer.red("No hash found for document", document.filename)
+    resumen = generate_sentence_brief(document_paths, images_paths, extra_info)
+    printer.green(f"✅ Sentencia ciudadana generada con éxito:\n{resumen}")
 
-    return {"status": "SUCCESS", "message": "Archivos subidos y en proceso de análisis"}
-
-
-@router.post("/webhook/{client_id}")
-async def webhook(client_id: str, request: Request):
-    from server.utils.socket_server import sio
-
-    data = await request.json()
-    hash_key = data.get("hash_key", None)
-    socket_id = redis_cache.hget(CLIENTS_KEY, client_id)
-    if socket_id and hash_key:
-        printer.green(f"Sending analysis process to {socket_id}", hash_key)
-        await sio.emit(f"analysis_process_{hash_key}", data, to=socket_id)
-    else:
-        printer.red("No socket id found for client", client_id)
-
-    return {"status": "success"}
+    return {
+        "status": "SUCCESS",
+        "message": "Sentencia ciudadana generada con éxito.",
+        "brief": resumen,
+    }

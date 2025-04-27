@@ -12,11 +12,13 @@ printer = Printer("AI INTERFACE")
 def get_physical_context() -> str:
     # Reads all the files from server/ai/context
     context_files = os.listdir("server/ai/context")
-    context_files = [f for f in context_files if f.endswith(".md")]
+    context_files = [
+        f for f in context_files if f.endswith(".md") or f.endswith(".txt")
+    ]
     context = ""
     for file in context_files:
         with open(f"server/ai/context/{file}", "r", encoding="utf-8") as f:
-            context += f'<FILE name="{file}">\n'
+            context += f'<FILE name="{file}" used_for="ai_context">\n'
             context += f.read()
             context += f"</FILE>\n"
     return context
@@ -87,6 +89,7 @@ class OllamaProvider:
             stream=stream,
         )
 
+        printer.yellow(response, "RESPONSE")
         return response.message.content
 
 

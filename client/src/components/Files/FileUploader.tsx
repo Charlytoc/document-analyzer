@@ -1,11 +1,12 @@
 import { useState } from "react";
 import { FileInput } from "./FileInput";
 import { Modal } from "../Modal/Modal";
-import { uploadData } from "../../utils/api";
-import { useStore } from "../../infrastructure/store";
+import { generateSentenceBrief } from "../../utils/api";
+import toast from "react-hot-toast";
+// import { useStore } from "../../infrastructure/store";
 
 type Props = {
-  onUploadSuccess?: (hashList: HashedFile[]) => void;
+  onUploadSuccess?: ({ brief }: { brief: string }) => void;
 };
 
 export type HashedFile = {
@@ -14,47 +15,49 @@ export type HashedFile = {
   hash: string;
 };
 
-const hashFile = async (file: File): Promise<string> => {
-  const buffer = await file.arrayBuffer();
-  const hashBuffer = await crypto.subtle.digest("SHA-256", buffer);
-  return Array.from(new Uint8Array(hashBuffer))
-    .map((b) => b.toString(16).padStart(2, "0"))
-    .join("");
-};
-
 export const FileUploader: React.FC<Props> = ({ onUploadSuccess }) => {
-  const clientId = useStore((state) => state.clientId);
+  // const clientId = useStore((state) => state.clientId);
   const [isOpen, setIsOpen] = useState(false);
   const [images, setImages] = useState<FileList | null>(null);
+  const [isLoading, setIsLoading] = useState(false);
+
   const [documents, setDocuments] = useState<FileList | null>(null);
 
   const handleSubmit = async (e: React.MouseEvent<HTMLButtonElement>) => {
     e.preventDefault();
 
+    const tid = toast.loading(
+      "Generando sentencia ciudadana, esto puede tardar unos minutos..."
+    );
+    setIsLoading(true);
     const formData = new FormData();
-    const hashList: HashedFile[] = [];
 
     const appendFiles = async (files: FileList | null, type: string) => {
       if (!files) return;
       for (let i = 0; i < files.length; i++) {
         const file = files[i];
-        const hash = await hashFile(file);
         formData.append(type, file);
-        hashList.push({ name: file.name, type, hash });
       }
     };
 
     try {
       await appendFiles(images, "images");
       await appendFiles(documents, "documents");
-
-      formData.append("hashes", JSON.stringify(hashList));
-
-      await uploadData(formData, clientId as string);
+      formData.append(
+        "extra_data",
+        JSON.stringify({
+          use_cache: false,
+        })
+      );
+      const resumen = await generateSentenceBrief(formData);
       setIsOpen(false);
-      if (onUploadSuccess) onUploadSuccess(hashList);
+      setIsLoading(false);
+      toast.success("Resumen generado con éxito", { id: tid });
+      if (onUploadSuccess) onUploadSuccess({ brief: resumen.brief });
     } catch (error) {
       console.error("Error al enviar datos:", error);
+      toast.error("Error al generar resumen", { id: tid });
+      setIsLoading(false);
     }
   };
 
@@ -94,9 +97,10 @@ export const FileUploader: React.FC<Props> = ({ onUploadSuccess }) => {
           <button
             onClick={handleSubmit}
             type="submit"
-            className="w-full py-2 px-4 button-edomex text-white font-semibold rounded-lg shadow-md cursor-pointer"
+            disabled={isLoading}
+            className="w-full py-2 px-4 button-edomex text-white font-semibold rounded-lg shadow-md cursor-pointer disabled:opacity-50"
           >
-            Listo
+            {isLoading ? "Generando resumen..." : "Listo"}
           </button>
         </form>
       </Modal>

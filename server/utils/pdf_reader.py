@@ -1,77 +1,104 @@
-# utils/pdf_reader.py
+# utils/document_reader.py
+
 from abc import ABC, abstractmethod
-import pdfplumber
-import fitz
 import os
 import hashlib
+import fitz  # PyMuPDF
+import pytesseract
+import pdfplumber
+from PIL import Image
+import io
+from docx import Document
 
 PAGE_CONNECTOR = "\n---PAGE---\n"
 
 
-class PDFStrategy(ABC):
+# =========================
+# Estrategia base
+# =========================
+
+class DocumentStrategy(ABC):
     document_hash: str | None = None
 
     @abstractmethod
     def read(self, path: str) -> str:
         pass
 
-    # def hash_text(self, text: str) -> str:
-    #     return hashlib.sha256(text.encode("utf-8")).hexdigest()
+    def hash_text(self, text: str) -> str:
+        return hashlib.sha256(text.encode("utf-8")).hexdigest()
 
     def split_pages(self, text: str) -> list[str]:
         return text.split(PAGE_CONNECTOR)
 
 
-class PDFPlumberStrategy(PDFStrategy):
-    def read(self, path: str) -> str:
-        pages = []
-        with pdfplumber.open(path) as pdf:
-            for page in pdf.pages:
-                pages.append(page.extract_text() or "")
+# =========================
+# Estrategias específicas
+# =========================
 
-        text = PAGE_CONNECTOR.join(pages)
-
-        return text
-
-
-class PyMuPDFStrategy(PDFStrategy):
+class PyMuPDFWithOCRStrategy(DocumentStrategy):
     def read(self, path: str) -> str:
         pages = []
         with fitz.open(path, filetype="pdf") as pdf:
             for page in pdf:
-                pages.append(page.get_text())
-        text = PAGE_CONNECTOR.join(pages)
+                text = page.get_text()
+                if not text.strip():
+                    pix = page.get_pixmap()
+                    img = Image.open(io.BytesIO(pix.tobytes()))
+                    text = pytesseract.image_to_string(img)
+                pages.append(text)
+        return PAGE_CONNECTOR.join(pages)
 
-        return text
+
+class DocxStrategy(DocumentStrategy):
+    def read(self, path: str) -> str:
+        doc = Document(path)
+        paragraphs = [p.text for p in doc.paragraphs if p.text]
+        return "\n".join(paragraphs)
 
 
-class PDFReader:
+class MarkdownStrategy(DocumentStrategy):
+    def read(self, path: str) -> str:
+        with open(path, "r", encoding="utf-8") as f:
+            return f.read()
+
+
+# =========================
+# Lector de documentos
+# =========================
+
+class DocumentReader:
     text: str | None = None
 
-    def __init__(self, engine: str = "pymupdf"):
-        self.strategy = self._get_strategy(engine)
+    def __init__(self):
+        self.strategy: DocumentStrategy | None = None
 
-    def _get_strategy(self, engine: str) -> PDFStrategy:
-        engine = engine.lower()
-        if engine == "pdfplumber":
-            return PDFPlumberStrategy()
-        elif engine == "pymupdf":
-            return PyMuPDFStrategy()
+    def _get_strategy(self, path: str) -> DocumentStrategy:
+        ext = os.path.splitext(path)[1].lower()
+
+        if ext == ".pdf":
+            return PyMuPDFWithOCRStrategy()
+        elif ext == ".docx":
+            return DocxStrategy()
+        elif ext == ".md":
+            return MarkdownStrategy()
         else:
-            raise ValueError(f"Engine '{engine}' no soportado")
+            raise ValueError(f"Tipo de archivo '{ext}' no soportado")
 
     def read(self, path: str) -> str:
         if not os.path.isfile(path):
             raise FileNotFoundError(f"Archivo no encontrado: {path}")
+
+        self.strategy = self._get_strategy(path)
         self.text = self.strategy.read(path)
-        # self.strategy.document_hash = self.strategy.hash_text(self.text)
 
         return self.text
 
-    # def get_hash(self) -> str:
-    #     if self.text is None:
-    #         raise ValueError("El texto no ha sido leído")
-    #     return self.strategy.hash_text(self.text)
-
     def split_pages(self, text: str) -> list[str]:
+        if self.strategy is None:
+            raise ValueError("No se ha leído ningún documento todavía")
         return self.strategy.split_pages(text)
+
+    def get_hash(self) -> str:
+        if self.text is None:
+            raise ValueError("No se ha leído ningún documento todavía")
+        return self.strategy.hash_text(self.text)

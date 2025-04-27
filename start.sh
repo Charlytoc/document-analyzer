@@ -23,7 +23,7 @@ while [[ "$#" -gt 0 ]]; do
     shift
 done
 
-# Si no se pasó el modo, preguntar al usuario
+# Preguntar al usuario si no se especificó
 if [ -z "$MODE" ]; then
     echo "🛠️ ¿Desea iniciar en modo desarrollo o producción? (dev/prod)"
     read MODE
@@ -59,20 +59,16 @@ echo "📦 Instalando dependencias desde requirements.txt..."
 pip install -r requirements.txt
 echo "✅ Dependencias instaladas."
 
-if [ "$MODE" == "prod" ]; then
-    echo "🔨 Ejecutando build de producción para el cliente..."
-    pushd client
-    npm install
-    npm run build
-    popd
-    echo "✅ Build de producción completado."
-else
+# Solo en modo desarrollo corre React
+if [ "$MODE" == "dev" ]; then
     echo "📦 Instalando dependencias del cliente en modo desarrollo..."
     pushd client
     npm install
     echo "🚀 Iniciando cliente en modo desarrollo..."
     npm run dev &
     popd
+else
+    echo "🏗️ Modo producción: NO se iniciará cliente React."
 fi
 
 echo "🚀 Verificando estado de Redis en Docker..."
@@ -88,9 +84,5 @@ else
     docker run -d --name document_redis -p 6380:6379 redis
 fi
 
-# Guardar PID de FastAPI por si quieres matarlo después con Ctrl+C
 echo "🚀 Iniciando la aplicación FastAPI..."
-python main.py &
-
-echo "🚀 Ejecutando workers..."
-celery -A server.celery_app worker --loglevel=info --pool=gevent
+python main.py

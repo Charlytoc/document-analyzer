@@ -1,171 +1,93 @@
 import os
-import json
-import requests
-from server.utils.pdf_reader import PDFReader
+from server.utils.pdf_reader import DocumentReader
 from server.utils.printer import Printer
 from server.utils.redis_cache import RedisCache
 from server.utils.ai_interface import AIInterface, get_physical_context
-from server.utils.constants import UPLOADS_PATH
+from server.utils.image_reader import ImageReader
 
 EXPIRATION_TIME = 60 * 60 * 24 * 30  # 30 days
-BATCH_SIZE = int(os.getenv("BATCH_SIZE", 12500))
+
+SYSTEM_PROMPT = os.getenv("SYSTEM_PROMPT", None)
+LIMIT_CHARACTERS_FOR_FILE = 50000
 
 printer = Printer("ROUTES")
 redis_cache = RedisCache()
 
+import hashlib
+import json
 
-def notify_client(
-    client_id: str, analysis: str, doc_hash: str, percentage: int, done: bool
+
+def generate_sentence_brief(
+    document_paths: list[str], images_paths: list[str], extra: dict = {}
 ):
-    if client_id:
-        requests.post(
-            f"http://localhost:8005/api/webhook/{client_id}",
-            json={
-                "hash_key": doc_hash,
-                "analysis": analysis,
-                "percentage": percentage,
-                "done": done,
-            },
-        )
+    physical_context = get_physical_context()
 
-
-def process_document(
-    filename: str, doc_hash: str, client_id: str, use_cache: bool = True
-) -> tuple[str, str]:
-
-    if use_cache and redis_cache.exists(doc_hash):
-        document = redis_cache.get(doc_hash)
-        document = json.loads(document)
-        text = document.get("text", "")
-        analysis = document.get("analysis", "")
-        notify_client(client_id, analysis, doc_hash, 100, True)
-        printer.green(f"Documento {filename} cargado desde caché")
-        return text, analysis
-
-    else:
-        printer.yellow("Caché inactivo, analizando documento...")
-        pdf_reader = PDFReader(engine="pymupdf")
-        document_text = pdf_reader.read(f"{UPLOADS_PATH}/documents/{filename}")
-        doc = {
-            "text": document_text,
-            "analysis": "",
-        }
-        redis_cache.set(doc_hash, json.dumps(doc), EXPIRATION_TIME)
-        document_analysis = analize_text_in_batches(
-            text=document_text,
-            batch_size=BATCH_SIZE,
-            client_id=client_id,
-            doc_hash=doc_hash,
-        )
-        doc["analysis"] = "\n".join(document_analysis)
-        redis_cache.set(doc_hash, json.dumps(doc), EXPIRATION_TIME)
-
-        printer.green("Documento guardado en el caché")
-        return document_text, "\n".join(document_analysis)
-
-
-def analize_text_in_batches(
-    text: str, batch_size: int = BATCH_SIZE, client_id: str = None, doc_hash: str = None
-):
-
-    printer.yellow(
-        f"Iniciando análisis de texto con tamaño de batch {batch_size} palabras y 20% de superposición"
+    use_cache = extra.get("use_cache", True)
+    system_from_client = extra.get("system_prompt", None)
+    ai_interface = AIInterface(
+        provider=os.getenv("PROVIDER", "ollama"), api_key=os.getenv("OLLAMA_API_KEY")
     )
-    document_analysis = []
-    words = text.split()
-    overlap = max(1, int(batch_size * 0.2))
-    step = batch_size - overlap
-    total_words = len(words)
 
-    for start in range(0, total_words, step):
-        end = min(start + batch_size, total_words)
-        batch_words = words[start:end]
-        batch_text = " ".join(batch_words)
-        analysis = analize_document_section(batch_text, document_analysis)
+    system_prompt = (
+        system_from_client
+        or SYSTEM_PROMPT
+        or """
+    ### Role
+    You are an incredible legal expert in Mexican law. You are will receive all the possible text from a set of documents and images, you need to analyze them, they are related to the same case. Extract the relevant information and explain the result of the sentence in a clear and concise way,  any person should understand it. Keep in mind that your main task is to write a "Sentencia Ciudadana". You will receive a set of context documents with an example of a "Sentencia Ciudadana" and some guidelines for you to follow.
 
-        document_analysis.append(
-            f"""```analysis "This analysis is from the word {start} to the word {end}"
-{start}-{end}
-```
-{analysis}
-"""
-        )
-
-        percentage_done = round(min(100, (end / total_words) * 100), 2)
-        is_last = end == total_words
-
-        printer.blue(f"Batch {start}-{end} analyzed {percentage_done}%")
-
-        notify_client(
-            client_id,
-            "".join(document_analysis),
-            doc_hash,
-            percentage_done,
-            is_last,
-        )
-
-    printer.green(f"Todos los batches del documento {doc_hash} analizados")
-    return document_analysis
-
-
-default_prompt = """
-    <SYSTEM_PROMPT>
-    
-    You are an incredible legal expert in Mexican law. You are given a text from a legal document, you need to analyze it, extract the relevant information and explain the result of the sentence in a clear and concise way. So that any person can understand it. Keep in mind that your main task is to EXTRACT information from the text such as names, dates, amounts, etc. Focus in the specific, not the general.
-    
-
-    <FAQ>
-    These are some example questions an user may ask:
-    - ¿Cual fue el resultado de la demanda?
-    - Explícame en pocas palabras el caso.
-    - ¿Cuál fue el resultado de la demanda?
-    - ¿Quién o quiénes son los quejosos del caso?
-    - ¿En qué leyes se basa el resultado?
-    - ¿Qué dice el documento con respecto a la pena impuesta?
-
-    </FAQ>
-
-    
-    This context files are useful to help you in your analysis, they are NOT part of the document you are analyzing, they are only a reference for you to answer the questions:
+    ### Context
+    These files are part of the context given to execute your task, use them to comprehend your task and follow the writing guidelines explained in the files:
     ---
     {{context}}
     ---
 
-
-    <INSTRUCTIONS>
-    - Extract all the relevant information from the given text, such as but not limited to: names of important people, objectives of the sentence, results, legal references, quantities (for example taxes, damages), testimonies, crimes committed, and everything that is relevant to the case.
-    - Be as precise as possible with laws, names of important people, objective of the sentence, results, etc.
-    - Continue from the previous analysis, don't start from scratch. We will concatenate your response with the previous analysis.
-    - Your response must be in Spanish.
-    </INSTRUCTIONS>
-
-"""
-
-
-def analize_document_section(batch_text: str, previous_analysis: list[str] = []):
-    physical_context = get_physical_context()
-
-    ai_interface = AIInterface(
-        provider=os.getenv("PROVIDER", "openai"), api_key=os.getenv("OPENAI_API_KEY")
+    ### Instructions
+    - Write a "Sentencia Ciudadana" using the files that will be in the user messages.
+    - Your response must be ONLY in Spanish.
+    - The final response should include all the relevant information from the files, don't miss any important detail.
+    """
     )
+    if physical_context:
+        system_prompt = system_prompt.replace("{{context}}", physical_context)
 
-    prompt = os.getenv("SYSTEM_PROMPT", None)
-    if not prompt:
-        printer.red(
-            "No se encontró el SYSTEM_PROMPT en el archivo .env, agréguelo para tener un análisis más preciso"
+    messages = [{"role": "system", "content": system_prompt}]
+    document_reader = DocumentReader()
+
+    for document_path in document_paths:
+        document_text = document_reader.read(document_path)
+        messages.append(
+            {
+                "role": "user",
+                "content": f"document: {document_text[:LIMIT_CHARACTERS_FOR_FILE]}",
+            }
         )
-        prompt = default_prompt
 
-    prompt = prompt.replace("{{context}}", physical_context)
+    for image_path in images_paths:
+        image_reader = ImageReader()
+        image_text = image_reader.read(image_path)
+        messages.append(
+            {
+                "role": "user",
+                "content": f"image: {image_text[:LIMIT_CHARACTERS_FOR_FILE]}",
+            }
+        )
 
-    messages = [
-        {"role": "system", "content": prompt},
-        *[{"role": "assistant", "content": a} for a in previous_analysis],
-        {"role": "user", "content": batch_text},
-    ]
+    # Crear hash de los mensajes
+    messages_json = json.dumps(messages, sort_keys=True)
+    messages_hash = hashlib.sha256(messages_json.encode("utf-8")).hexdigest()
 
-    response = ai_interface.chat(
-        messages=messages, model=os.getenv("MODEL", "gpt-4o-mini")
-    )
+    if use_cache:
+        cached_response = redis_cache.get(messages_hash)
+        if cached_response:
+            printer.green(f"Cache hit for hash: {messages_hash}")
+            return cached_response
+
+    # Si no existe en cache, generar nueva respuesta
+    printer.red(f"Cache miss for hash: {messages_hash}")
+    response = ai_interface.chat(messages=messages, model=os.getenv("MODEL", "gemma3"))
+
+    # Guardar en cache
+    redis_cache.set(messages_hash, response, ex=EXPIRATION_TIME)
+    printer.green(f"Cache saved for hash: {messages_hash}")
 
     return response
