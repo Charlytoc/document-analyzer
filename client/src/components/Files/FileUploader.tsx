@@ -20,6 +20,8 @@ export const FileUploader: React.FC<Props> = ({ onUploadSuccess }) => {
   const [isOpen, setIsOpen] = useState(false);
   const [images, setImages] = useState<FileList | null>(null);
   const [isLoading, setIsLoading] = useState(false);
+  const [useCache, setUseCache] = useState(false);
+  const [systemPrompt, setSystemPrompt] = useState("");
 
   const [documents, setDocuments] = useState<FileList | null>(null);
 
@@ -46,7 +48,8 @@ export const FileUploader: React.FC<Props> = ({ onUploadSuccess }) => {
       formData.append(
         "extra_data",
         JSON.stringify({
-          use_cache: false,
+          use_cache: useCache,
+          system_prompt: systemPrompt,
         })
       );
       const resumen = await generateSentenceBrief(formData);
@@ -73,7 +76,7 @@ export const FileUploader: React.FC<Props> = ({ onUploadSuccess }) => {
       <Modal isOpen={isOpen} onClose={() => setIsOpen(false)}>
         <form
           onSubmit={(e) => e.preventDefault()}
-          className="max-w-lg p-6 rounded-lg"
+          className="max-w-lg p-6 rounded-lg flex flex-col gap-4"
         >
           <h2 className="text-3xl font-bold mb-6 text-gray-800 text-center">
             Subir Archivos
@@ -93,6 +96,32 @@ export const FileUploader: React.FC<Props> = ({ onUploadSuccess }) => {
             name="documents"
             onChange={setDocuments}
           />
+
+          <div className="flex items-center gap-2">
+            <input
+              type="checkbox"
+              name="use_cache"
+              id="use_cache"
+              checked={useCache}
+              onChange={() => setUseCache(!useCache)}
+            />
+            <label htmlFor="use_cache">Usar caché</label>
+          </div>
+
+          <div className="mt-4 flex flex-col gap-2">
+            <label htmlFor="system_prompt">
+              Prompt del sistema (si no se especifica, se usará el prompt por
+              defecto)
+            </label>
+            <textarea
+              className="w-full border border-gray-300 rounded-md p-2"
+              name="system_prompt"
+              id="system_prompt"
+              rows={3}
+              value={systemPrompt}
+              onChange={(e) => setSystemPrompt(e.target.value)}
+            ></textarea>
+          </div>
 
           <button
             onClick={handleSubmit}
