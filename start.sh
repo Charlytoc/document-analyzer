@@ -84,5 +84,11 @@ else
     docker run -d --name document_redis -p 6380:6379 redis
 fi
 
+echo "🚀 Iniciando servidor de Chroma..."
+chroma run --path media/vector_storage/ --port 8004 &
+
+echo "🚀 Esperando a que el servidor de Chroma esté listo..."
+sleep 5
+
 echo "🚀 Iniciando la aplicación FastAPI..."
 python main.py

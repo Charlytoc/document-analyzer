@@ -7,6 +7,7 @@ from typing import List
 from server.utils.printer import Printer
 from server.utils.redis_cache import RedisCache
 from server.utils.processor import generate_sentence_brief
+from server.ai.vector_store import chroma_client
 
 UPLOADS_PATH = "uploads"
 os.makedirs(f"{UPLOADS_PATH}/images", exist_ok=True)
@@ -27,6 +28,7 @@ async def generate_sentence_brief_route(
 ):
     printer.yellow("🔄 Generando sentencia ciudadana...")
 
+    print("🚨 Validación de archivos", chroma_client)
     # 🚨 Validación de archivos
     if not images and not documents:
         printer.red("❌ No se enviaron documentos ni imágenes.")
