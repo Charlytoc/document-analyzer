@@ -144,6 +144,13 @@ def generate_sentence_brief(
             }
         )
 
+    messages.append(
+        {
+            "role": "user",
+            "content": "Tu respuesta debe estar en español SIEMPRE sin ningún tipo de excepción.",
+        }
+    )
+
     messages_json = json.dumps(messages, sort_keys=True)
     messages_hash = hashlib.sha256(messages_json.encode("utf-8")).hexdigest()
 
