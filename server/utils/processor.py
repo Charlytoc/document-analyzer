@@ -154,7 +154,7 @@ def generate_sentence_brief(
 
     messages_json = json.dumps(messages, sort_keys=True, indent=4)
     # Save the messages to a file
-    with open("messages.json", "w") as f:
+    with open("messages.json", "w", encoding="utf-8") as f:
         f.write(messages_json)
     messages_hash = hashlib.sha256(messages_json.encode("utf-8")).hexdigest()
 
