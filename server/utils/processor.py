@@ -64,7 +64,7 @@ def get_faq_results(doc_hash: str):
             n_results=3,
         )
         # printer.yellow(retrieval, "\n\n--------\n\n")
-        documents = flatten_list(retrieval["documents"])
+        documents = flatten_list(retrieval.get("documents", []))
         results_str += f"### {question.upper()}\n\n{'\n'.join(documents)}\n\n"
 
     return results_str
