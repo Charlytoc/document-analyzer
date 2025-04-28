@@ -72,6 +72,23 @@ def get_faq_results(doc_hash: str):
     return results_str
 
 
+def translate_to_spanish(text: str):
+    system_prompt = """
+    Your task is to translate a given text to spanish, preserve the original meaning and structure of the text. Return only the translated text, without any other text or explanation.
+    """
+    ai_interface = AIInterface(
+        provider=os.getenv("PROVIDER", "ollama"), api_key=os.getenv("OLLAMA_API_KEY")
+    )
+    response = ai_interface.chat(
+        messages=[
+            {"role": "system", "content": system_prompt},
+            {"role": "user", "content": text},
+        ],
+        model=os.getenv("MODEL", "gemma3"),
+    )
+    return response
+
+
 def generate_sentence_brief(
     document_paths: list[str], images_paths: list[str], extra: dict = {}
 ):
@@ -166,8 +183,8 @@ def generate_sentence_brief(
 
     printer.red(f"Cache miss for hash: {messages_hash}")
     response = ai_interface.chat(messages=messages, model=os.getenv("MODEL", "gemma3"))
+    response = translate_to_spanish(response)
 
-    # Guardar en cache
     redis_cache.set(messages_hash, response, ex=EXPIRATION_TIME)
     printer.green(f"Cache saved for hash: {messages_hash}")
 
