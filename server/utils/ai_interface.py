@@ -88,8 +88,6 @@ class OllamaProvider:
             tools=tools,
             stream=stream,
         )
-
-        printer.yellow(response, "RESPONSE")
         return response.message.content
 
 
