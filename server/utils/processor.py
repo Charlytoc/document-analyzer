@@ -55,7 +55,8 @@ def flatten_list(nested_list):
 
 
 def get_faq_results(doc_hash: str):
-    results = {}
+    results_str = ""
+
     for question in get_faq_questions():
         retrieval = chroma_client.get_results(
             collection_name=f"doc_{doc_hash}",
@@ -64,11 +65,8 @@ def get_faq_results(doc_hash: str):
         )
         # printer.yellow(retrieval, "\n\n--------\n\n")
         documents = flatten_list(retrieval["documents"])
-        results[question] = "\n".join(documents)
+        results_str += f"### {question.upper()}\n\n{'\n'.join(documents)}\n\n"
 
-    results_str = "\n".join(
-        [f"### {question}\n\n{results[question]}" for question in results]
-    )
     return results_str
 
 
