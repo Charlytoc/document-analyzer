@@ -106,14 +106,22 @@ def generate_sentence_brief(
     if physical_context:
         system_prompt = system_prompt.replace("{{context}}", physical_context)
 
-    messages = [{"role": "system", "content": system_prompt}]
+    messages = [
+        {"role": "system", "content": system_prompt},
+        {
+            "role": "user",
+            "content": "Tu respuesta debe estar en español SIEMPRE sin ningún tipo de excepción.",
+        },
+    ]
     document_reader = DocumentReader()
 
     for document_path in document_paths:
         document_text = document_reader.read(document_path)
         document_hash = hasher(document_text)
         chroma_client.get_or_create_collection(f"doc_{document_hash}")
-        chunks = chroma_client.chunkify(document_text)
+        chunks = chroma_client.chunkify(
+            document_text, chunk_size=600, chunk_overlap=125
+        )
         chroma_client.bulk_upsert_chunks(
             collection_name=f"doc_{document_hash}",
             chunks=chunks,
@@ -143,13 +151,6 @@ def generate_sentence_brief(
                 "content": f"# FAQ RESULTS FOR IMAGE {image_path}\n\n{faq_results}",
             }
         )
-
-    messages.append(
-        {
-            "role": "user",
-            "content": "Tu respuesta debe estar en español SIEMPRE sin ningún tipo de excepción.",
-        }
-    )
 
     messages_json = json.dumps(messages, sort_keys=True, indent=4)
     # Save the messages to a file
