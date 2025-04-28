@@ -63,7 +63,6 @@ def get_faq_results(doc_hash: str):
             query_texts=[question],
             n_results=3,
         )
-        # printer.yellow(retrieval, "\n\n--------\n\n")
         documents = flatten_list(retrieval.get("documents", []))
         results_str += f"### {question.upper()}\n\n{'\n'.join(documents)}\n\n"
 
@@ -121,13 +120,7 @@ def generate_sentence_brief(
     if physical_context:
         system_prompt = system_prompt.replace("{{context}}", physical_context)
 
-    messages = [
-        {"role": "system", "content": system_prompt},
-        {
-            "role": "user",
-            "content": "Tu respuesta debe estar en español SIEMPRE sin ningún tipo de excepción.",
-        },
-    ]
+    messages = [{"role": "system", "content": system_prompt}]
     document_reader = DocumentReader()
 
     for document_path in document_paths:
@@ -146,6 +139,12 @@ def generate_sentence_brief(
             {
                 "role": "user",
                 "content": f"# FAQ RESULTS FOR DOCUMENT {document_path}\n\n{faq_results}",
+            }
+        )
+        messages.append(
+            {
+                "role": "user",
+                "content": f"Initial content of the document, often it contains a lot of useful information to extract: {document_text[:10000]}",
             }
         )
 
