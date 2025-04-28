@@ -135,7 +135,7 @@ def generate_sentence_brief(
         document_hash = hasher(document_text)
         chroma_client.get_or_create_collection(f"doc_{document_hash}")
         chunks = chroma_client.chunkify(
-            document_text, chunk_size=600, chunk_overlap=125
+            document_text, chunk_size=1000, chunk_overlap=200
         )
         chroma_client.bulk_upsert_chunks(
             collection_name=f"doc_{document_hash}",
