@@ -138,31 +138,24 @@ def generate_sentence_brief(
         messages.append(
             {
                 "role": "user",
-                "content": f"# FAQ RESULTS FOR DOCUMENT {document_path}\n\n{faq_results}",
+                "content": f"# FAQ RESULTS FOR DOCUMENT, use this information to write the Sentencia Ciudadana: {document_path}\n\n{faq_results}",
             }
         )
         messages.append(
             {
                 "role": "user",
-                "content": f"Initial content of the document, often it contains a lot of useful information to extract: {document_text[:10000]}",
+                "content": f"Initial content of the document, often it contains a lot of useful information to extract: {document_text[:15000]}",
             }
         )
 
     for image_path in images_paths:
         image_reader = ImageReader()
         image_text = image_reader.read(image_path)
-        image_hash = hasher(image_text)
-        chroma_client.get_or_create_collection(f"img_{image_hash}")
-        chunks = chroma_client.chunkify(image_text, chunk_size=600, chunk_overlap=125)
-        chroma_client.bulk_upsert_chunks(
-            collection_name=f"img_{image_hash}",
-            chunks=chunks,
-        )
-        faq_results = get_faq_results(image_hash)
+
         messages.append(
             {
                 "role": "user",
-                "content": f"# FAQ RESULTS FOR IMAGE {image_path}\n\n{faq_results}",
+                "content": f"<Image source={image_path}>\n\n{image_text}\n\n</Image>",
             }
         )
 
